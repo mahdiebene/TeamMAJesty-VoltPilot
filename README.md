@@ -4,11 +4,37 @@ An LLM-powered, minimum-cost 24-hour energy scheduler for the BUP GridWise chall
 The model interprets operator notes; validated constraints feed a SciPy/HiGHS linear
 program. An independent replay checks every serialized schedule before success.
 
-**Release status:** 37 local tests, all 10 offline public cases, and a Linux Docker
-build/publish/pull/run cycle passed. The image was tested as non-root with a read-only
-filesystem. No public API or frontend is deployed yet. A privately configured
-hosted-model credential and working VPS access are required to finish deployment.
-Do not claim judge readiness from offline tests alone.
+**Backend API:** http://35.222.65.204
+
+**Temporary HTTPS mirror:** https://fame-choice-amended-diabetes.trycloudflare.com
+
+**Submission checklist:** [SUBMISSION.md](SUBMISSION.md) ·
+**2:50 video narration:** [VIDEO_SCRIPT.md](VIDEO_SCRIPT.md)
+
+**Current verified state:** the same-origin dashboard is deployed on GCP. Its public
+page returns 200 and malformed JSON returns a controlled 400. The fixed-address
+HTTP origin is permitted by the challenge and serves synthetic data only; keep the
+VM and its external IP allocated throughout judging. The temporary
+Cloudflare quick-tunnel URL can change on process restart and has no uptime guarantee.
+The VM model is configured and `/health` returns 200. A real external SAMPLE-01
+request passed interpretation, independent replay and the 38,365 BDT optimum in
+**1.784 seconds**. The full live public suite subsequently passed **10/10 cases**,
+with serial p50 **6.341s** and p95 **8.045s**. HTTP does
+not provide encryption; do not enter credentials or personal data into the dashboard.
+
+The frontend is packaged for **Vercel**, with exact API routes proxied to the GCP
+backend. No manual API URL or CORS configuration is needed for that deployment.
+See [deploy/README.md](deploy/README.md) for private
+credential setup, managed startup and rotation without affecting other VM services.
+
+```text
+Scenario + operator notes
+        -> Real LLM: structured interpretation of every note
+        -> Deterministic JSON / Pydantic guardrails
+        -> Directive bounds -> SciPy / HiGHS minimum-cost LP
+        -> Independent serialized-schedule replay
+        -> Exact API JSON + dashboard / export
+```
 
 ## Minimal submission
 
@@ -89,10 +115,15 @@ Set-Location 'F:\TeamMAJesty-VoltPilot'
 & 'F:\TeamMAJesty-VoltPilot\.venv\Scripts\python.exe' -m uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1 --no-access-log
 ```
 
-For Linux with variables already privately supplied:
+For Linux, configure the same terminal that starts Uvicorn. The hidden key prompt
+does not put the key in shell history:
 
 ```bash
 cd /opt/voltpilot
+export LLM_BASE_URL='https://gen.pollinations.ai/v1'
+export LLM_MODEL='google/gemini-3.8-flash'
+read -rsp 'Backend API key (hidden): ' LLM_API_KEY; echo
+export LLM_API_KEY
 /opt/voltpilot/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1 --no-access-log
 ```
 
@@ -108,6 +139,7 @@ redirects and environment proxies to avoid accidental credential forwarding.
   400; model, solver, overload or deadline failure is sanitized 500 JSON. No partial
   schedule and no fabricated `no_op` after failed interpretation.
 - `/docs` and `/openapi.json`: interactive API reference and machine-readable schema.
+- `/`: testing dashboard; loading it and its public sample inputs uses no model quota.
 
 Every request has `scenario_id`, 1–3 `operator_notes`, `battery` and 24 `hours`.
 Successful responses contain `scenario_id`, `directive_interpretation`,
@@ -184,7 +216,11 @@ instead of `voltpilot:local`, first performing `docker pull` on that digest with
 authorized private-package access (`read:packages` where applicable). The judge
 also needs securely supplied runtime model credentials, not just image access.
 
-### Verified fallback reference (2026-09-18)
+### Previous verified fallback reference (2026-09-18)
+
+This reference predates the dashboard. For the current source, dispatch the private
+release workflow and use its new digest; do not describe the historical image as
+containing newer frontend or deployment changes.
 
 - Source revision: `696c4ef623191ee5f11fdd5c2fd3224ec4131710`.
 - Tag: `ghcr.io/mahdiebene/teammajesty-voltpilot:sha-696c4ef623191ee5f11fdd5c2fd3224ec4131710`.
@@ -214,20 +250,24 @@ the same commands. It still requires owner access; CI cannot bypass VPS login.
 
 ## Frontend on Vercel
 
-There is **no custom frontend in this minimal judging repository**. `/docs` is API
-documentation, not a dashboard. A separately built frontend may be deployed on
-Vercel without moving the Python/SciPy service there.
+The `frontend` directory is a dependency-free static dashboard, also served by the
+backend at `/`. It loads only public sample **inputs**, accepts JSON imports, sends
+one request on an explicit quota-confirmed click, and displays charts, directives,
+hourly dispatch and exportable JSON. It never contains a model key or a production
+mock/fallback. UI validation is not a replacement for backend replay.
 
-1. Give the VPS API a working HTTPS URL. An HTTPS Vercel page cannot directly fetch
-   an HTTP API because browsers block mixed content.
-2. Set backend `CORS_ORIGINS` to the exact Vercel production origin (or custom
-   domain), then restart only the VoltPilot container. Add specific preview origins
-   deliberately; wildcard Vercel domains are rejected. Localhost HTTP origins are
-   allowed for development.
-3. Configure only the public API base URL in the browser frontend. Keep
-   `LLM_API_KEY` exclusively in the backend runtime. JSON requests use
-   `Content-Type: application/json`; cookies/login are not required.
-4. Test preflight, successful responses and safe errors from the actual frontend.
+For Vercel, import the private repository, choose Root Directory `frontend`,
+Framework Preset **Other**, no build command, and Output Directory `.`.
+`frontend/vercel.json` proxies `/health`, `/optimize-energy`, `/docs`, and
+`/openapi.json` to the GCP backend at `http://35.222.65.204`. The browser uses only
+the Vercel HTTPS origin, so there is no mixed-content request and no cross-origin
+preflight. Leave the API override blank. No model or Vercel key belongs in frontend
+configuration. The proxy-to-VM hop uses public HTTP for synthetic challenge data;
+model credentials travel only from backend to provider over HTTPS.
+
+Disable Vercel Deployment Protection for the production judging URL, then test
+health and a live scenario from an incognito window. The judge must not need a
+Vercel login. The Python/SciPy runtime stays on GCP; it is not a serverless function.
 
 CORS is a browser policy, **not authentication or spending protection**. The judge
 API must remain reachable without login. Provider-side hard budgets/quotas are
@@ -261,23 +301,66 @@ can fail safely. A dependency compatibility check is not a security audit.
 
 ## Verification evidence and remaining gates
 
-- Local baseline: 32 unit/API/provider-mock tests and all 10 offline public costs
-  passed. Five additional CORS/configuration tests also pass (37 total).
-- Prior authorized Pollinations SAMPLE-01 smoke: production interpreter through
-  local ASGI, 2 notes correct, 24 hours replayed, 38,365 BDT; 11.55 seconds and two
-  provider attempts. This was one scenario, not a live full-suite or p95 result.
-- Linux x86-64 CPython 3.12 Docker build succeeded. All 37 tests and all 10 offline
-  public cases passed inside the image with test-network access disabled. The
-  published image was removed locally, pulled by digest and retested successfully,
-  including real HTTP readiness, invalid input, safe missing-model failure and
-  OpenAPI checks. No live inference was used in those checks.
-- No public VPS endpoint, real-model container run, complete live public suite or
-  independent language holdout benchmark is verified yet. The confirmed VPS host
-  identity was accepted only after independent owner verification; the configured
-  SSH login was rejected. No VPS services or configuration were changed.
-- Submission still needs the verified public API URL, exact tested image digest
-  with judge access, secure runtime model access, live latency/reliability evidence,
-  and the required accessible video of at most three minutes.
+- 49 Python tests discovered: 47 passed on Windows and two POSIX permission tests
+  skipped there (covered by Linux container checks). Mocked provider tests are not
+  live-model evidence.
+- All 10 public cases pass **live** through the deployed Pollinations
+  `google/gemini-3.8-flash` interpreter. Each response matches organizer directives,
+  passes independent physical replay and matches the optimum within 0.01 BDT.
+  Serial p50: **6.341s**, p95: **8.045s**, failures: **0/10**. This small sample is
+  not a hidden-test or uptime guarantee. All **7/7 independently labeled paraphrases**
+  also passed live (5.50–7.54s), covering all six directive types and BY/TO reductions.
+  An earlier interrupted acceptance attempt produced one backend model timeout;
+  do not interpret the completed run as proof that the provider never fails.
+- All 10 frontend logic tests pass, including the Vercel proxy route contract.
+  Real Chromium checks desktop/mobile and 2560-pixel full-width layout,
+  input loading, consent, charts/table/export enablement, safe text, and stale-result
+  clearing. Optimization is intercepted with TEST-ONLY fixtures in this smoke test.
+- The dashboard image passed Linux in-container tests and both configured/unconfigured
+  HTTP smoke paths under non-root, read-only, CPU/memory-limited execution.
+- External checks confirm dashboard 200, safe malformed-input 400, configured
+  health 200, and a real SAMPLE-01 pass in 1.784 seconds with the selected model.
+- Still required: Vercel deployment,
+  a matching pullable fallback image,
+  post-deadline repository visibility, and an accessible video of at most 3 minutes.
+
+### Dashboard and limited-quota verification
+
+From the checkout root, run the existing Python regression commands plus:
+
+```bash
+node --test frontend/tests/core.test.mjs
+python3 -B -m scripts.validate_public_cases --base-url http://127.0.0.1:18080 --case SAMPLE-01
+```
+
+The second command sends **one real scenario** (the backend can attempt the provider
+twice). It checks interpretation against public ground truth and independently
+replays all physical constraints and totals. It is not the full live release gate.
+Repeat `--case` to select cases deliberately; omitting it runs all ten.
+
+Independently labeled paraphrases include BY versus TO reductions, reserve
+percentages of capacity, spelled-out numbers, time windows, and no-op distractors:
+
+```bash
+python3 -B -m scripts.validate_paraphrases --offline
+# Seven real requests; run only with sufficient provider quota:
+python3 -B -m scripts.validate_paraphrases --base-url http://127.0.0.1:18080
+```
+
+The paraphrases are development checks, not organizer hidden tests. Expected labels
+exist only in verification inputs; production never imports or matches them.
+
+`scripts/browser_smoke.mjs` uses Node 24 and an already-installed Chromium browser.
+Run against an unconfigured local Uvicorn server on `127.0.0.1:18081`:
+
+```bash
+node scripts/browser_smoke.mjs /usr/bin/google-chrome http://127.0.0.1:18081
+```
+
+It intercepts optimization calls with clearly test-only fixtures, checks sample
+loading, consent, result rendering, safe text, error clearing and mobile layout.
+It never sends a provider request and is not live-model evidence. Python POSIX
+credential-permission tests skip on Windows and run inside the Linux container.
 
 Credits: Python, FastAPI, Pydantic, Uvicorn, HTTPX, NumPy, SciPy/HiGHS; organizer
 GridWise challenge/sample pack; Pollinations gateway (requested model

@@ -4,3 +4,10 @@
 !requirements.txt
 !requirements-lock.txt
 !Dockerfile
+!frontend/
+!frontend/index.html
+!frontend/assets/
+!frontend/assets/*.js
+!frontend/assets/*.mjs
+!frontend/assets/*.css
+!frontend/assets/samples.json

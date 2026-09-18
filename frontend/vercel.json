@@ -1,0 +1,18 @@
+{
+  "framework": null,
+  "rewrites": [
+    {"source": "/health", "destination": "http://35.222.65.204/health"},
+    {"source": "/optimize-energy", "destination": "http://35.222.65.204/optimize-energy"},
+    {"source": "/docs", "destination": "http://35.222.65.204/docs"},
+    {"source": "/openapi.json", "destination": "http://35.222.65.204/openapi.json"}
+  ],
+  "headers": [
+    {"source": "/(.*)", "headers": [
+      {"key": "X-Content-Type-Options", "value": "nosniff"},
+      {"key": "Referrer-Policy", "value": "no-referrer"},
+      {"key": "X-Frame-Options", "value": "DENY"},
+      {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"},
+      {"key": "Cache-Control", "value": "no-cache"}
+    ]}
+  ]
+}

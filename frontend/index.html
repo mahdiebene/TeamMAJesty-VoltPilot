@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="VoltPilot: model-assisted, constraint-checked campus energy scheduling.">
+  <title>VoltPilot · Energy control room</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="VoltPilot home"><span class="brand-mark">V</span>VoltPilot<span class="brand-sub">/ GRIDWISE</span></a>
+    <span class="team">TEAM MAJESTY <span class="dot"></span> CONTROL ROOM</span>
+  </header>
+  <main>
+    <section class="hero">
+      <div><p class="eyebrow">INTELLIGENT CAMPUS ENERGY</p><h1>Every kilowatt.<br><span>A smarter decision.</span></h1>
+      <p class="intro">Turn operator notes into a constraint-checked, minimum-cost 24-hour plan. Real model interpretation. Deterministic optimization.</p></div>
+      <div class="workflow"><span>01 <b>Interpret notes</b></span><span>02 <b>Optimize energy</b></span><span>03 <b>Replay & validate</b></span><p>No model calls until you run a scenario.</p></div>
+    </section>
+
+    <section class="panel connection" aria-labelledby="connection-title">
+      <div><h2 id="connection-title">System connection</h2><p class="muted">Vercel dashboard → live optimization API. Ready to test your next scenario.</p></div>
+      <div class="connection-controls"><label for="api-base">API override <span class="muted">(optional — leave blank)</span></label><div class="inline"><input id="api-base" type="url" autocomplete="off" spellcheck="false" placeholder="Automatic · connected through this site"><button id="health-button" class="secondary" type="button">Check health</button></div></div>
+      <p id="health-status" role="status" class="status">Not checked · health does not verify model quota.</p>
+    </section>
+
+    <div class="workspace">
+      <section class="panel input-panel" aria-labelledby="scenario-title">
+        <div class="section-heading"><div><p class="eyebrow">01 / SCENARIO</p><h2 id="scenario-title">Plan your next 24 hours</h2></div><span class="pill">LIVE API ONLY</span></div>
+        <label for="sample">Public sample input</label><div class="inline"><select id="sample" disabled><option>Loading samples…</option></select><button id="load-sample" class="secondary" type="button" disabled>Load</button></div>
+        <p class="hint">Samples contain inputs only—not precomputed answers. Loading one uses no model quota.</p>
+        <div class="editor-heading"><label for="scenario-json">Scenario JSON</label><label class="file-label" for="import-file">Import JSON<input id="import-file" type="file" accept=".json,application/json"></label></div>
+        <textarea id="scenario-json" spellcheck="false" aria-describedby="editor-help" rows="20"></textarea>
+        <p id="editor-help" class="hint">Include scenario_id, 1–3 operator_notes, battery limits, and hours 0–23. Edit notes here to test new wording.</p>
+        <label class="consent"><input id="quota-consent" type="checkbox">I understand this run uses provider quota (up to two model attempts).</label>
+        <button id="run-button" class="primary" type="button" disabled>Optimize scenario <span aria-hidden="true">↗</span></button>
+        <p id="run-status" role="status" aria-live="polite" class="status">Ready for input. No model request has been sent.</p>
+      </section>
+
+      <section class="results" aria-labelledby="results-title">
+        <div class="section-heading"><div><p class="eyebrow">02 / ENERGY PLAN</p><h2 id="results-title">Results, not guesswork.</h2></div><button id="download-button" class="secondary" type="button" disabled>Export JSON</button></div>
+        <div id="empty-state" class="panel empty-state"><span class="empty-icon" aria-hidden="true">⌁</span><h3>Your next energy plan starts here.</h3><p>Choose a sample or import a scenario, check the connection, and run optimization.</p><p class="hint">No simulated results. Failed requests never produce a fabricated schedule.</p></div>
+        <div id="result-content" hidden>
+          <p id="result-context" class="hint"></p>
+          <div class="metrics"><article class="panel"><span>Total grid cost</span><strong id="metric-cost"></strong><small>BDT / day</small></article><article class="panel"><span>Grid energy</span><strong id="metric-grid"></strong><small>kWh / day</small></article><article class="panel"><span>Peak grid</span><strong id="metric-peak"></strong><small>kWh / hour</small></article></div>
+          <section class="panel chart-panel" aria-labelledby="chart-title"><h3 id="chart-title">24-hour energy profile</h3><p class="legend"><span class="grid-key">● Grid import</span><span class="solar-key">● Solar used</span><span class="battery-key">● Battery stored</span></p><svg id="energy-chart" viewBox="0 0 700 240" role="img" aria-label="Hourly grid, solar and battery energy in kWh"></svg><p class="hint">Hour 00 → 23 · kWh · exact values in the table below.</p></section>
+          <section class="panel"><h3>Interpreted directives</h3><ol id="directives" class="directives"></ol></section>
+          <section class="panel"><h3>Plan summary</h3><p id="plan-summary"></p><p class="hint">Backend replay validates physical constraints against extracted directives. Check note meanings independently; model interpretation can still be wrong.</p></section>
+          <section class="panel"><h3>Hourly dispatch</h3><div class="table-scroll"><table><caption class="sr-only">Hourly energy schedule, all energy values in kWh</caption><thead><tr><th>Hour</th><th>Grid</th><th>Solar</th><th>Action</th><th>Battery Δ</th><th>Stored</th></tr></thead><tbody id="hourly-plan"></tbody></table></div></section>
+          <details class="panel"><summary>Raw API response</summary><pre id="raw-response"></pre></details>
+        </div>
+      </section>
+    </div>
+    <footer><span>VoltPilot / Team MAJesty</span><span>Real LLM → SciPy / HiGHS → independent replay</span><a id="docs-link" href="/docs" target="_blank" rel="noopener noreferrer">API documentation ↗</a></footer>
+  </main>
+</body>
+</html>

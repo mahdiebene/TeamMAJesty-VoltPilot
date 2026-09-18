@@ -24,10 +24,17 @@ def main() -> int:
     mode.add_argument("--offline", action="store_true", help="Use reference directives, no model/API readiness claim")
     mode.add_argument("--base-url", help="Live GridWise service URL")
     parser.add_argument("--repeat", type=int, default=1)
+    parser.add_argument("--case", action="append", dest="case_ids",
+                        help="Run only this exact public case ID; repeat the flag to select several")
     args = parser.parse_args()
     if args.repeat < 1:
         parser.error("--repeat must be positive")
     cases = json.loads((ROOT / "BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json").read_text(encoding="utf-8-sig"))["cases"]
+    if args.case_ids:
+        unknown = set(args.case_ids) - {case["id"] for case in cases}
+        if unknown:
+            parser.error("Unknown public case ID; no request sent")
+        cases = [case for case in cases if case["id"] in args.case_ids]
     failures = 0
     timings = []
     with httpx.Client(timeout=30, follow_redirects=False, trust_env=False) as client:

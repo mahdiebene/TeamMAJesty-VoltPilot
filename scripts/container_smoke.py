@@ -66,6 +66,11 @@ def main() -> int:
                         raise RuntimeError("Container startup exceeded 55 seconds") from None
                     time.sleep(0.25)
             assert (status, payload) == ((200, {"status": "ok"}) if configured else (503, {"status": "not_ready"}))
+            with build_opener(ProxyHandler({})).open(base + "/", timeout=3) as response:
+                assert response.status == 200 and b"VoltPilot" in response.read()
+                assert response.headers["X-Content-Type-Options"] == "nosniff"
+            status, samples = probe(base, "/assets/samples.json")
+            assert status == 200 and len(samples) == 10 and "expected_output" not in samples[0]
             assert probe(base, "/optimize-energy", b"{") == (400, {"error": {"code": "invalid_request"}})
             status, schema = probe(base, "/openapi.json")
             assert status == 200 and "/optimize-energy" in schema["paths"]

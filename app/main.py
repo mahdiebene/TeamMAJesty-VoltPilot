@@ -19,6 +19,7 @@ from app.json_utils import load_json
 from app.llm import ModelInterpreter
 from app.optimizer import optimize
 from app.schemas import Scenario, Schedule
+from app.web import router as web_router
 
 LOG = logging.getLogger("gridwise")
 
@@ -99,6 +100,7 @@ def create_app(settings: Settings | None = None, interpreter=None) -> FastAPI:
                 executor.shutdown(wait=True, cancel_futures=True)
 
     application = FastAPI(title="VoltPilot | GridWise", version="0.1.0", lifespan=lifespan)
+    application.include_router(web_router)
     application.add_middleware(RequestBoundary, seconds=settings.deadline_seconds)
     if settings.cors_origins:
         # Outside RequestBoundary so safe error responses also carry CORS headers.
