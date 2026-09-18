@@ -269,6 +269,26 @@ Disable Vercel Deployment Protection for the production judging URL, then test
 health and a live scenario from an incognito window. The judge must not need a
 Vercel login. The Python/SciPy runtime stays on GCP; it is not a serverless function.
 
+### Vercel import settings
+
+Import the private `mahdiebene/TeamMAJesty-VoltPilot` repository and select:
+
+| Setting | Value |
+| --- | --- |
+| Branch | `main` |
+| Root Directory | `frontend` |
+| Framework Preset | Other |
+| Build Command | None (empty) |
+| Install Command | None (empty) |
+| Output Directory | `.` |
+| Environment Variables | **None required** |
+
+Do **not** copy `.env.example` into Vercel: those variables configure only the GCP
+backend. In particular, `LLM_API_KEY` stays in the VM's private runtime env-file.
+After deployment, check `/health` returns `{"status":"ok"}` and leave the
+dashboard's API override blank. Tests are retained in GitHub for reproducibility
+but excluded from the frontend upload by `frontend/.vercelignore`.
+
 CORS is a browser policy, **not authentication or spending protection**. The judge
 API must remain reachable without login. Provider-side hard budgets/quotas are
 needed to limit exposure; concurrency alone does not cap aggregate spending.
