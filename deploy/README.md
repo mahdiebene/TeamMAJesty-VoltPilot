@@ -118,20 +118,7 @@ application deadline. Verify externally before declaring the API public.
 
 For Vercel, deploy only `/opt/voltpilot/current/frontend` (or the repository's
 `frontend` root) as static files; the backend stays on GCP. The included
-`vercel.json` rewrites exact judging paths to the fixed HTTP backend. Leave the
-browser API override empty: browser requests stay on Vercel HTTPS with no CORS
+`vercel.json` rewrites exact judging paths to the fixed HTTP backend. Keep the
+automatic same-origin connection: browser requests stay on Vercel HTTPS with no CORS
 requirement. Disable Vercel production Deployment Protection so judges can call
 the service without login. No Vercel credentials are bundled.
-
-## Final release checklist
-
-- [x] VM live model request and all ten public ground-truth cases pass.
-- [x] Seven independently labeled new-language notes/scenarios pass live.
-- [ ] Vercel frontend and same-origin proxy pass externally without login.
-- [ ] Temporary/exposed key is revoked; replacement has an appropriate hard budget.
-- [ ] New private source revision and matching immutable image are published/tested.
-- [ ] Judges have authorized private image access and securely supplied model access.
-- [ ] Required at-most-three-minute video and submission form are completed by owner.
-
-No shortlist, event-timing compliance, public uptime or live readiness is inferred
-from offline regression results.

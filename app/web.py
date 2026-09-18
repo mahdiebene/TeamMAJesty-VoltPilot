@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 
 ROOT = Path(__file__).resolve().parents[1] / "frontend"
-ASSETS = {"app.js", "core.mjs", "config.js", "styles.css", "samples.json"}
+ASSETS = {"app.js", "core.mjs", "styles.css", "samples.json"}
 HEADERS = {
     "Cache-Control": "no-cache",
     "X-Content-Type-Options": "nosniff",

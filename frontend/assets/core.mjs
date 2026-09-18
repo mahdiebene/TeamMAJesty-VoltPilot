@@ -1,19 +1,6 @@
 // Pure browser-side helpers, also exercised with Node's built-in test runner.
 export const MAX_BODY_BYTES = 1024 * 1024;
 
-export function apiBase(value, pageOrigin) {
-  const input = value.trim();
-  const url = new URL(input || pageOrigin);
-  const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-  const sameOrigin = url.origin === new URL(pageOrigin).origin;
-  if ((url.protocol !== "https:" && !(url.protocol === "http:" && (local || sameOrigin))) ||
-      url.username || url.password || url.search || url.hash || url.pathname !== "/" ||
-      /\s/.test(input)) {
-    throw new Error("Use a credential-free HTTPS origin, the current origin, or HTTP localhost, without a path.");
-  }
-  return url.origin;
-}
-
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const number = value => typeof value === "number" && Number.isFinite(value);
 const energy = value => number(value) && value >= 0;
@@ -113,7 +100,7 @@ export async function requestJSON(base, path, body, timeout = 29000, fetcher = g
     return data;
   } catch (error) {
     if (controller.signal.aborted) throw new Error("Request timed out; it may already have used model quota. No automatic retry was sent.");
-    if (error instanceof TypeError) throw new Error("Cannot reach the API. Check HTTPS, the address, and the exact frontend CORS origin.");
+    if (error instanceof TypeError) throw new Error("Cannot reach the API. Check your connection and the backend deployment.");
     throw error;
   } finally { clearTimeout(timer); }
 }

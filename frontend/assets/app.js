@@ -1,15 +1,22 @@
-import {API_BASE_URL} from "./config.js";
-import {apiBase, parseScenario, validateSchedule, requestJSON, MAX_BODY_BYTES} from "./core.mjs";
+import {parseScenario, validateSchedule, requestJSON, MAX_BODY_BYTES} from "./core.mjs";
 
 const $ = id => document.getElementById(id);
 const number = value => new Intl.NumberFormat("en-US", {maximumFractionDigits: 2}).format(value);
+// Both GCP and Vercel expose the API on the page's own origin. No saved overrides.
+const endpoint = window.location.origin;
 let samples = [];
 let result = null;
 let busy = false;
+let checkingHealth = false;
 
 function status(id, text, kind = "") {
   $(id).textContent = text;
   $(id).dataset.kind = kind;
+}
+
+function emptyState(title, description) {
+  $("empty-title").textContent = title;
+  $("empty-description").textContent = description;
 }
 
 function clearResult() {
@@ -17,22 +24,61 @@ function clearResult() {
   $("result-content").hidden = true;
   $("empty-state").hidden = false;
   $("download-button").disabled = true;
+  $("result-context").textContent = "Results will appear after a successful run.";
+  emptyState("No dispatch plan yet", "Review the scenario and operator notes, then run optimization.");
 }
 
 function updateButtons() {
   $("run-button").disabled = busy || !$("quota-consent").checked || !$("scenario-json").value.trim();
-  for (const id of ["api-base", "health-button", "scenario-json", "import-file", "quota-consent"]) $(id).disabled = busy;
+  for (const id of ["scenario-json", "import-file", "quota-consent"]) $(id).disabled = busy;
+  for (const editor of $("note-editors").querySelectorAll("textarea")) editor.disabled = busy;
   $("sample").disabled = busy || !samples.length;
   $("load-sample").disabled = busy || !samples.length;
   $("download-button").disabled = busy || !result;
+  $("run-label").textContent = busy ? "Working…" : "Run optimization";
+  document.querySelector(".results").setAttribute("aria-busy", String(busy));
 }
 
-function base() {
-  const value = apiBase($("api-base").value, window.location.origin);
-  if (window.location.protocol === "https:" && value.startsWith("http:")) throw new Error("An HTTPS dashboard requires an HTTPS API (no mixed content).");
-  $("docs-link").href = value + "/docs";
-  try { localStorage.setItem("voltpilot-api-origin", $("api-base").value.trim()); } catch { /* Storage is optional. */ }
-  return value;
+function inputChanged() {
+  clearResult();
+  status("run-status", "Input changed. Run to update the plan.");
+  updateButtons();
+}
+
+function previewScenario() {
+  $("note-editors").replaceChildren();
+  try {
+    const scenario = parseScenario($("scenario-json").value);
+    $("scenario-id").textContent = scenario.scenario_id;
+    $("input-demand").textContent = number(scenario.hours.reduce((sum, hour) => sum + hour.demand_kwh, 0)) + " kWh";
+    $("input-solar").textContent = number(scenario.hours.reduce((sum, hour) => sum + hour.solar_kwh, 0)) + " kWh";
+    $("input-battery").textContent = number(scenario.battery.capacity_kwh) + " kWh";
+    $("note-count").textContent = `${scenario.operator_notes.length} / 3`;
+    for (const [index, note] of scenario.operator_notes.entries()) {
+      const wrapper = document.createElement("div");
+      const label = document.createElement("label");
+      label.htmlFor = `operator-note-${index}`;
+      label.textContent = `Note ${String(index + 1).padStart(2, "0")}`;
+      const editor = document.createElement("textarea");
+      editor.id = label.htmlFor;
+      editor.rows = 3;
+      editor.value = note;
+      editor.addEventListener("input", () => {
+        // Draft notes may be temporarily empty. Validate the complete request on Run.
+        const draft = JSON.parse($("scenario-json").value);
+        draft.operator_notes[index] = editor.value;
+        $("scenario-json").value = JSON.stringify(draft, null, 2);
+        inputChanged();
+      });
+      wrapper.append(label, editor);
+      $("note-editors").append(wrapper);
+    }
+  } catch (error) {
+    $("scenario-id").textContent = "Check scenario data";
+    for (const id of ["input-demand", "input-solar", "input-battery"]) $(id).textContent = "—";
+    $("note-count").textContent = "";
+    status("run-status", error.message, "error");
+  }
 }
 
 function svgNode(tag, attributes) {
@@ -63,11 +109,11 @@ function renderChart(hours) {
   }
 }
 
-function render(schedule, elapsed, endpoint) {
+function render(schedule, elapsed) {
   $("metric-cost").textContent = number(schedule.total_cost_bdt);
   $("metric-grid").textContent = number(schedule.total_grid_kwh);
   $("metric-peak").textContent = number(schedule.peak_grid_kwh);
-  $("result-context").textContent = `${schedule.scenario_id} · ${elapsed.toFixed(2)}s · ${endpoint}`;
+  $("result-context").textContent = `${schedule.scenario_id} · 24 intervals · ${elapsed.toFixed(2)}s`;
   $("plan-summary").textContent = schedule.plan_summary;
   $("raw-response").textContent = JSON.stringify(schedule, null, 2);
   $("directives").replaceChildren();
@@ -77,7 +123,7 @@ function render(schedule, elapsed, endpoint) {
     title.textContent = directive.directive_type.replaceAll("_", " ");
     const adjustment = document.createElement("code");
     adjustment.textContent = JSON.stringify(directive.structured_adjustment);
-    const description = document.createElement("span");
+    const description = document.createElement("p");
     description.textContent = directive.explanation;
     item.append(title, adjustment, description);
     $("directives").append(item);
@@ -89,7 +135,7 @@ function render(schedule, elapsed, endpoint) {
     for (const [index, value] of [String(hour.hour).padStart(2, "0") + ":00", number(hour.grid_kwh), number(hour.solar_used_kwh), hour.battery_action, number(delta), number(hour.battery_energy_after_kwh)].entries()) {
       const cell = document.createElement("td");
       cell.textContent = value;
-      if (index === 3) cell.dataset.action = hour.battery_action;
+      if (index === 3) cell.className = `action ${hour.battery_action}`;
       row.append(cell);
     }
     $("hourly-plan").append(row);
@@ -102,17 +148,17 @@ function render(schedule, elapsed, endpoint) {
 
 function loadSample() {
   const sample = samples[Number($("sample").value)];
-  if (!sample) return;
+  if (!sample || busy) return;
   $("scenario-json").value = JSON.stringify(sample.input, null, 2);
   clearResult();
   status("run-status", `${sample.id} loaded. No model call sent.`);
+  previewScenario();
   updateButtons();
 }
 
 $("load-sample").addEventListener("click", loadSample);
 $("quota-consent").addEventListener("change", updateButtons);
-$("scenario-json").addEventListener("input", () => { clearResult(); status("run-status", "Input changed. Run to obtain a new result."); updateButtons(); });
-$("api-base").addEventListener("input", () => { clearResult(); status("health-status", "Endpoint changed; not checked."); $("docs-link").removeAttribute("href"); updateButtons(); });
+$("scenario-json").addEventListener("input", () => { inputChanged(); previewScenario(); });
 $("import-file").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file || busy) return;
@@ -123,23 +169,28 @@ $("import-file").addEventListener("change", async event => {
     if (file.size > MAX_BODY_BYTES) throw new Error("File exceeds 1 MiB.");
     const scenario = parseScenario(await file.text());
     $("scenario-json").value = JSON.stringify(scenario, null, 2);
+    previewScenario();
     status("run-status", "Scenario imported. No model call sent.");
   } catch (error) { status("run-status", error.message, "error"); }
   finally { busy = false; event.target.value = ""; updateButtons(); }
 });
 
-$("health-button").addEventListener("click", async () => {
-  if (busy) return;
-  busy = true;
-  updateButtons();
-  status("health-status", "Checking local API configuration…");
+async function checkHealth() {
+  if (checkingHealth) return;
+  checkingHealth = true;
+  $("health-button").disabled = true;
+  status("health-status", "Checking API…", "pending");
   try {
-    const response = await requestJSON(base(), "/health", undefined, 5000);
+    const response = await requestJSON(endpoint, "/health", undefined, 5000);
     if (response.status !== "ok") throw new Error("Unexpected health response.");
-    status("health-status", "API configured · provider access and quota still require a live scenario test.", "success");
-  } catch (error) { status("health-status", error.message, "error"); }
-  finally { busy = false; updateButtons(); }
-});
+    status("health-status", "API configured", "success");
+    $("health-button").title = "Backend configuration check passed. Provider access and quota still require a live run. Click to recheck.";
+  } catch (error) {
+    status("health-status", "API not ready", "error");
+    $("health-button").title = error.message + " Click to recheck.";
+  } finally { checkingHealth = false; $("health-button").disabled = false; }
+}
+$("health-button").addEventListener("click", checkHealth);
 
 $("run-button").addEventListener("click", async () => {
   if (busy || !$("quota-consent").checked) return;
@@ -148,14 +199,17 @@ $("run-button").addEventListener("click", async () => {
   updateButtons();
   try {
     const scenario = parseScenario($("scenario-json").value);
-    const endpoint = base();
     const start = performance.now();
-    status("run-status", "Interpreting notes and optimizing… one scenario, no automatic browser retry.");
+    emptyState("Building the dispatch plan", "Interpreting operator notes and solving the hourly schedule. This may take a few seconds.");
+    status("run-status", "Request sent. Waiting for interpretation and optimization…");
     const schedule = validateSchedule(await requestJSON(endpoint, "/optimize-energy", scenario), scenario);
-    render(schedule, (performance.now() - start) / 1000, endpoint);
-    status("run-status", "Schedule received. Review directive meanings before trusting the plan.", "success");
-  } catch (error) { clearResult(); status("run-status", error.message, "error"); }
-  finally { busy = false; updateButtons(); }
+    render(schedule, (performance.now() - start) / 1000);
+    status("run-status", "Plan received. Review the note interpretation.", "success");
+  } catch (error) {
+    clearResult();
+    emptyState("No plan generated", error.message);
+    status("run-status", error.message, "error");
+  } finally { busy = false; updateButtons(); }
 });
 
 $("download-button").addEventListener("click", () => {
@@ -169,10 +223,6 @@ $("download-button").addEventListener("click", () => {
 });
 
 async function initialize() {
-  let initial = API_BASE_URL;
-  try { initial = localStorage.getItem("voltpilot-api-origin") ?? initial; } catch { /* Storage is optional. */ }
-  $("api-base").value = initial;
-  try { $("docs-link").href = apiBase(initial, window.location.origin) + "/docs"; } catch { $("docs-link").removeAttribute("href"); }
   try {
     const response = await fetch("/assets/samples.json", {credentials: "omit", redirect: "error", cache: "no-cache"});
     if (!response.ok) throw new Error("Samples unavailable");
@@ -185,13 +235,16 @@ async function initialize() {
       option.textContent = `${sample.id} · ${sample.label}`;
       return option;
     }));
-    // Never overwrite an import or user typing that happened while samples loaded.
+    // Never overwrite an import or typing that happened while samples loaded.
     if (!$("scenario-json").value && !busy) loadSample();
   } catch {
     samples = [];
-    status("run-status", "Sample loading failed. You can still import or paste a scenario.", "error");
+    $("sample").replaceChildren(new Option("Samples unavailable", ""));
+    $("scenario-data").open = true;
+    status("run-status", "Sample loading failed. Import or paste a scenario.", "error");
   }
   updateButtons();
 }
 
 initialize();
+checkHealth();

@@ -17,3 +17,6 @@ build/
 node_modules/
 *.tar
 *.tar.gz
+# Local submission working notes are kept outside the source repository.
+/SUBMISSION.md
+/VIDEO_SCRIPT.md

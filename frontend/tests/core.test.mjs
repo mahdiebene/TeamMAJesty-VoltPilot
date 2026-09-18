@@ -1,19 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {apiBase, parseScenario, validateSchedule, requestJSON} from "../assets/core.mjs";
+import {parseScenario, validateSchedule, requestJSON} from "../assets/core.mjs";
 
 const cases = JSON.parse(readFileSync(new URL("../../BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json", import.meta.url), "utf8").replace(/^\uFEFF/, "")).cases;
 
-test("API origins are explicit and credential-free", () => {
-  assert.equal(apiBase("", "https://api.example"), "https://api.example");
-  assert.equal(apiBase("", "http://35.222.65.204"), "http://35.222.65.204");
-  assert.equal(apiBase(" https://api.example/ ", "https://page.example"), "https://api.example");
-  assert.equal(apiBase("http://localhost:18080", "https://page.example"), "http://localhost:18080");
-  assert.equal(apiBase("http://[::1]:18080", "https://page.example"), "http://[::1]:18080");
-  for (const value of ["http://remote.example", "https://user:key@api.example", "https://api.example/path", "https://api.example?key=secret", "https://api.example#secret", "javascript:alert(1)", "https://api.\nexample"]) {
-    assert.throws(() => apiBase(value, "https://page.example"));
-  }
+test("dashboard uses its own origin without manual or saved API overrides", () => {
+  const app = readFileSync(new URL("../assets/app.js", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(app, /const endpoint = window\.location\.origin;/);
+  assert.doesNotMatch(app, /localStorage|API_BASE_URL|config\.js/);
+  assert.doesNotMatch(html, /id="api-base"/);
 });
 
 test("Vercel keeps exact judging endpoints on its own origin", () => {

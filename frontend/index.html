@@ -3,57 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="VoltPilot: model-assisted, constraint-checked campus energy scheduling.">
-  <title>VoltPilot · Energy control room</title>
+  <meta name="description" content="VoltPilot campus energy scheduling: operator notes, hourly dispatch and grid costs.">
+  <title>Energy planner · VoltPilot</title>
   <link rel="stylesheet" href="/assets/styles.css">
   <script type="module" src="/assets/app.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="VoltPilot home"><span class="brand-mark">V</span>VoltPilot<span class="brand-sub">/ GRIDWISE</span></a>
-    <span class="team">TEAM MAJESTY <span class="dot"></span> CONTROL ROOM</span>
+    <a class="brand" href="/" aria-label="VoltPilot home"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M4 7h5l5 14 5-14h5M4 14h6m8 0h6"/></svg>VoltPilot<span class="brand-sub">GridWise</span></a>
+    <div class="header-tools"><span class="team">Team MAJesty</span><button id="health-button" class="health-button" type="button" title="Check backend configuration. This does not verify model access or quota."><span id="health-status" role="status" data-kind="pending">Checking API…</span><span aria-hidden="true">↻</span></button></div>
   </header>
   <main>
-    <section class="hero">
-      <div><p class="eyebrow">INTELLIGENT CAMPUS ENERGY</p><h1>Every kilowatt.<br><span>A smarter decision.</span></h1>
-      <p class="intro">Turn operator notes into a constraint-checked, minimum-cost 24-hour plan. Real model interpretation. Deterministic optimization.</p></div>
-      <div class="workflow"><span>01 <b>Interpret notes</b></span><span>02 <b>Optimize energy</b></span><span>03 <b>Replay & validate</b></span><p>No model calls until you run a scenario.</p></div>
-    </section>
-
-    <section class="panel connection" aria-labelledby="connection-title">
-      <div><h2 id="connection-title">System connection</h2><p class="muted">Vercel dashboard → live optimization API. Ready to test your next scenario.</p></div>
-      <div class="connection-controls"><label for="api-base">API override <span class="muted">(optional — leave blank)</span></label><div class="inline"><input id="api-base" type="url" autocomplete="off" spellcheck="false" placeholder="Automatic · connected through this site"><button id="health-button" class="secondary" type="button">Check health</button></div></div>
-      <p id="health-status" role="status" class="status">Not checked · health does not verify model quota.</p>
-    </section>
-
+    <div class="page-heading"><div><h1>Energy planner</h1><p>Schedule grid, solar and battery use over 24 hours.</p></div><a id="docs-link" class="text-link" href="/docs" target="_blank" rel="noopener noreferrer">API reference <span aria-hidden="true">↗</span></a></div>
     <div class="workspace">
       <section class="panel input-panel" aria-labelledby="scenario-title">
-        <div class="section-heading"><div><p class="eyebrow">01 / SCENARIO</p><h2 id="scenario-title">Plan your next 24 hours</h2></div><span class="pill">LIVE API ONLY</span></div>
-        <label for="sample">Public sample input</label><div class="inline"><select id="sample" disabled><option>Loading samples…</option></select><button id="load-sample" class="secondary" type="button" disabled>Load</button></div>
-        <p class="hint">Samples contain inputs only—not precomputed answers. Loading one uses no model quota.</p>
-        <div class="editor-heading"><label for="scenario-json">Scenario JSON</label><label class="file-label" for="import-file">Import JSON<input id="import-file" type="file" accept=".json,application/json"></label></div>
-        <textarea id="scenario-json" spellcheck="false" aria-describedby="editor-help" rows="20"></textarea>
-        <p id="editor-help" class="hint">Include scenario_id, 1–3 operator_notes, battery limits, and hours 0–23. Edit notes here to test new wording.</p>
-        <label class="consent"><input id="quota-consent" type="checkbox">I understand this run uses provider quota (up to two model attempts).</label>
-        <button id="run-button" class="primary" type="button" disabled>Optimize scenario <span aria-hidden="true">↗</span></button>
-        <p id="run-status" role="status" aria-live="polite" class="status">Ready for input. No model request has been sent.</p>
+        <div class="panel-heading"><h2 id="scenario-title">Scenario</h2><span class="subtle-label">Input</span></div>
+        <div class="input-body">
+          <label for="sample">Load a public sample</label>
+          <div class="inline"><select id="sample" disabled><option>Loading samples…</option></select><button id="load-sample" class="secondary" type="button" disabled>Load</button></div>
+          <div class="scenario-overview"><span id="scenario-id">No scenario loaded</span><span>24-hour horizon</span></div>
+          <dl class="input-facts"><div><dt>Demand</dt><dd id="input-demand">—</dd></div><div><dt>Solar forecast</dt><dd id="input-solar">—</dd></div><div><dt>Battery capacity</dt><dd id="input-battery">—</dd></div></dl>
+          <div class="notes-heading"><h3>Operator notes</h3><span id="note-count" class="subtle-label"></span></div>
+          <p class="hint">Edit the instructions the model will interpret.</p>
+          <div id="note-editors" class="note-editors"></div>
+          <details id="scenario-data" class="scenario-data"><summary>Scenario data <span>JSON</span></summary>
+            <div class="editor-heading"><label for="scenario-json">Full request</label><label class="file-label" for="import-file">Import JSON<input id="import-file" type="file" accept=".json,application/json"></label></div>
+            <textarea id="scenario-json" spellcheck="false" aria-describedby="editor-help" rows="14"></textarea>
+            <p id="editor-help" class="hint">Edit battery limits, hourly demand, solar and tariffs here. Include 1–3 operator notes and hours 0–23.</p>
+          </details>
+        </div>
+        <div class="run-controls">
+          <label class="consent"><input id="quota-consent" type="checkbox"><span>Allow model usage for this run.<small>Up to two provider attempts per request.</small></span></label>
+          <button id="run-button" class="primary" type="button" disabled><span id="run-label">Run optimization</span><span aria-hidden="true">→</span></button>
+          <p id="run-status" role="status" aria-live="polite" class="status">No optimization request sent.</p>
+        </div>
       </section>
-
-      <section class="results" aria-labelledby="results-title">
-        <div class="section-heading"><div><p class="eyebrow">02 / ENERGY PLAN</p><h2 id="results-title">Results, not guesswork.</h2></div><button id="download-button" class="secondary" type="button" disabled>Export JSON</button></div>
-        <div id="empty-state" class="panel empty-state"><span class="empty-icon" aria-hidden="true">⌁</span><h3>Your next energy plan starts here.</h3><p>Choose a sample or import a scenario, check the connection, and run optimization.</p><p class="hint">No simulated results. Failed requests never produce a fabricated schedule.</p></div>
+      <section class="results" aria-labelledby="results-title" aria-busy="false">
+        <div class="results-heading"><div><h2 id="results-title">Dispatch plan</h2><p id="result-context" class="hint">Results will appear after a successful run.</p></div><button id="download-button" class="secondary" type="button" disabled>Export JSON <span aria-hidden="true">↓</span></button></div>
+        <div id="empty-state" class="panel empty-state">
+          <svg class="empty-chart" viewBox="0 0 200 96" aria-hidden="true"><path class="empty-grid" d="M8 16h184M8 48h184M8 80h184M40 8v80m40-80v80m40-80v80m40-80v80"/><path class="empty-line" d="M8 69h24l16-22 24 8 20-30 20 13 16-8 22 28 20-9h22"/></svg>
+          <h3 id="empty-title">No dispatch plan yet</h3><p id="empty-description">Review the scenario and operator notes, then run optimization.</p><span class="empty-caption">Grid cost · Energy profile · Hourly schedule</span>
+        </div>
         <div id="result-content" hidden>
-          <p id="result-context" class="hint"></p>
-          <div class="metrics"><article class="panel"><span>Total grid cost</span><strong id="metric-cost"></strong><small>BDT / day</small></article><article class="panel"><span>Grid energy</span><strong id="metric-grid"></strong><small>kWh / day</small></article><article class="panel"><span>Peak grid</span><strong id="metric-peak"></strong><small>kWh / hour</small></article></div>
-          <section class="panel chart-panel" aria-labelledby="chart-title"><h3 id="chart-title">24-hour energy profile</h3><p class="legend"><span class="grid-key">● Grid import</span><span class="solar-key">● Solar used</span><span class="battery-key">● Battery stored</span></p><svg id="energy-chart" viewBox="0 0 700 240" role="img" aria-label="Hourly grid, solar and battery energy in kWh"></svg><p class="hint">Hour 00 → 23 · kWh · exact values in the table below.</p></section>
-          <section class="panel"><h3>Interpreted directives</h3><ol id="directives" class="directives"></ol></section>
-          <section class="panel"><h3>Plan summary</h3><p id="plan-summary"></p><p class="hint">Backend replay validates physical constraints against extracted directives. Check note meanings independently; model interpretation can still be wrong.</p></section>
-          <section class="panel"><h3>Hourly dispatch</h3><div class="table-scroll"><table><caption class="sr-only">Hourly energy schedule, all energy values in kWh</caption><thead><tr><th>Hour</th><th>Grid</th><th>Solar</th><th>Action</th><th>Battery Δ</th><th>Stored</th></tr></thead><tbody id="hourly-plan"></tbody></table></div></section>
-          <details class="panel"><summary>Raw API response</summary><pre id="raw-response"></pre></details>
+          <div class="metrics"><article><span>Total grid cost</span><strong id="metric-cost"></strong><small>BDT / day</small></article><article><span>Grid energy</span><strong id="metric-grid"></strong><small>kWh / day</small></article><article><span>Peak grid import</span><strong id="metric-peak"></strong><small>kWh in one hour</small></article></div>
+          <section class="panel chart-panel" aria-labelledby="chart-title"><div class="panel-heading"><h3 id="chart-title">Energy profile</h3><span class="subtle-label">kWh</span></div><div class="chart-body"><p class="legend"><span class="grid-key">Grid import</span><span class="solar-key">Solar used</span><span class="battery-key">Battery stored</span></p><svg id="energy-chart" viewBox="0 0 700 240" role="img" aria-label="Hourly grid, solar and battery energy in kWh"></svg><p class="chart-caption">Hour of day · 00–23</p></div></section>
+          <section class="panel"><div class="panel-heading"><h3>Note interpretation</h3><span class="subtle-label">Model output</span></div><ol id="directives" class="directives"></ol><p class="interpretation-note">Check these against your notes. Physical replay checks the schedule, not the model’s understanding.</p></section>
+          <section class="panel summary-panel"><h3>Plan summary</h3><p id="plan-summary"></p></section>
+          <section class="panel"><div class="panel-heading"><h3>Hourly dispatch</h3><span class="subtle-label">24 intervals · kWh</span></div><div class="table-scroll"><table><caption class="sr-only">Hourly energy schedule, all energy values in kWh</caption><thead><tr><th>Hour</th><th>Grid</th><th>Solar</th><th>Action</th><th>Battery Δ</th><th>Stored</th></tr></thead><tbody id="hourly-plan"></tbody></table></div></section>
+          <details class="panel raw-response"><summary>API response <span>JSON</span></summary><pre id="raw-response"></pre></details>
         </div>
       </section>
     </div>
-    <footer><span>VoltPilot / Team MAJesty</span><span>Real LLM → SciPy / HiGHS → independent replay</span><a id="docs-link" href="/docs" target="_blank" rel="noopener noreferrer">API documentation ↗</a></footer>
+    <footer><span>VoltPilot · Team MAJesty</span><span>LLM interpretation / HiGHS optimization / Schedule replay</span></footer>
   </main>
 </body>
 </html>
