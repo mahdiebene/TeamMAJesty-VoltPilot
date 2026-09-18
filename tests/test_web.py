@@ -1,4 +1,7 @@
+import base64
+import hashlib
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -41,3 +44,21 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         root = Path(__file__).resolve().parents[1]
         inputs = json.loads((root / "frontend" / "assets" / "samples.json").read_text(encoding="utf-8"))
         self.assertEqual(inputs, [{key: case[key] for key in ("id", "label", "input")} for case in CASES])
+
+    async def test_vercel_docs_policy_allows_actual_swagger_assets_and_bootstrap(self):
+        root = Path(__file__).resolve().parents[1]
+        config = json.loads((root / "frontend" / "vercel.json").read_text(encoding="utf-8"))
+        rule = next(rule for rule in config["headers"] if rule["source"] == "/docs")
+        policy = next(header["value"] for header in rule["headers"] if header["key"] == "Content-Security-Policy")
+        app = create_app(Settings())
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/docs")
+        self.assertEqual(response.status_code, 200)
+        scripts = re.findall(r"<script>(.*?)</script>", response.text, re.DOTALL)
+        self.assertEqual(len(scripts), 1)
+        for script in scripts:
+            digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
+            self.assertIn("'sha256-" + digest + "'", policy)
+        for url in re.findall(r'(?:src|href)="(https://cdn\.jsdelivr\.net/[^\"]+)"', response.text):
+            self.assertIn(url, policy)
+        self.assertIn("url: '/openapi.json'", response.text)

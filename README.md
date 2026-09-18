@@ -63,6 +63,12 @@ The selected gateway is Pollinations. Provider model IDs and availability can
 change. No local model is bundled. Never commit a real key or place one in Vercel,
 frontend code, build arguments or images. Rotate previously exposed credentials.
 
+`app/config.py` reads `LLM_API_KEY` from the backend environment; `app/llm.py`
+sends it as `Authorization: Bearer ...` to `LLM_BASE_URL/chat/completions` when
+interpreting notes. The browser calls our API, not Pollinations directly. Health
+checks and sample loading do not use the key; optimization does. SciPy itself
+does not need an API key.
+
 ```bash
 export LLM_BASE_URL='https://gen.pollinations.ai/v1'
 export LLM_MODEL='google/gemini-3.8-flash'
@@ -106,7 +112,14 @@ node --test /opt/voltpilot/frontend/tests/core.test.mjs
 ```
 
 Node 24 and an installed Chromium browser can also exercise the dashboard against
-an unconfigured local server on port 18081:
+an unconfigured local server on port 18081. Start it in a separate terminal:
+
+```bash
+cd /opt/voltpilot
+env -u LLM_API_KEY -u LLM_BASE_URL -u LLM_MODEL /opt/voltpilot/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 18081 --workers 1
+```
+
+Then run:
 
 ```bash
 node /opt/voltpilot/scripts/browser_smoke.mjs /usr/bin/google-chrome http://127.0.0.1:18081
@@ -117,20 +130,32 @@ It checks note/JSON synchronization, same-origin POST forwarding, consent,
 chart/table rendering, download/import, safe text, failure handling, and layout
 at 320–2560px. It is not live-model evidence.
 
+Check the production API reference in a real browser without sending optimization
+requests (GET-only, no provider quota):
+
+```bash
+node /opt/voltpilot/scripts/docs_smoke.mjs /usr/bin/google-chrome https://volt-pilot-one.vercel.app
+```
+
+This checks rendered Swagger endpoints, the live OpenAPI schema, and CSP/runtime
+errors—not just an HTTP 200 response. Docs alone allow pinned Swagger CDN assets
+and a hashed initializer; the dashboard retains its stricter script policy.
+
 For one real model request with independent ground-truth checks:
 
 ```bash
 /opt/voltpilot/.venv/bin/python -B -m scripts.validate_public_cases --base-url http://35.222.65.204 --case SAMPLE-01
 ```
 
-Omitting `--case` runs all ten public cases. Recorded live checks on September 18:
-10/10 public cases passed interpretation, replay and optimum checks (p50 6.341s,
-p95 8.045s); 7/7 separately labeled paraphrases passed. A later SAMPLE-01 request
-through Vercel passed at 38,365 BDT in 1.571s. An earlier provider timeout occurred;
-these observations do not guarantee hidden-test performance or uptime.
+Omitting `--case` runs all ten public cases. Latest recorded live checks on
+September 18, approximately 22:24–22:25 (+06:00): 10/10 public cases passed
+interpretation, replay and optimum checks against the direct API (serial p50
+1.031s, p95 1.419s); 7/7 separately labeled paraphrases passed through Vercel
+(0.993–1.339s). An earlier provider timeout occurred; these observations do not
+guarantee hidden-test performance or uptime.
 
-Local regression: 49 Python tests discovered, 47 passed and 2 POSIX-only permission
-tests skipped on Windows; 10/10 frontend tests passed, plus the Chromium smoke test.
+Local regression: 50 Python tests discovered, 48 passed and 2 POSIX-only permission
+tests skipped on Windows; 11/11 frontend tests passed. Browser checks are separate.
 
 ## Docker
 
@@ -141,10 +166,10 @@ docker build --tag voltpilot:local /opt/voltpilot
 /opt/voltpilot/.venv/bin/python -B -m scripts.container_smoke --image voltpilot:local
 ```
 
-Published fallback from source `b645d8df8e989de3bcb908a326aef5c4f12e3adb`:
+Published fallback from source `df5311bc5be57ce9c1b47d8abe7e036b93995bf9`:
 
 ```bash
-IMAGE='ghcr.io/mahdiebene/teammajesty-voltpilot@sha256:a0a7860de5ad4cbaf62b7f287c84194affce31ac822457f1d0ce12f3ada65508'
+IMAGE='ghcr.io/mahdiebene/teammajesty-voltpilot@sha256:1e4797c107df0d04b03765d34527193294aff2a71ff986e3b7c092c3ea22665c'
 docker pull "$IMAGE"
 docker run --detach --name voltpilot-api --restart unless-stopped \
   --cpus 2 --memory 2g --pids-limit 128 --cap-drop ALL \
@@ -161,9 +186,12 @@ loopback-only. Ensure its name and port are unused. The image contains no runtim
 credentials. A judge needs both registry access and their own securely supplied
 model configuration.
 
-[Release run 35365773995](https://github.com/mahdiebene/TeamMAJesty-VoltPilot/actions/runs/35365773995)
-successfully published, pulled and retested that digest. It has the previous UI,
-not the redesigned planner. The package is private; anonymous pull is not promised.
+[Release run 35367777308](https://github.com/mahdiebene/TeamMAJesty-VoltPilot/actions/runs/35367777308)
+successfully published, pulled and retested that digest. It includes the redesigned
+planner; the subsequent Vercel-only Docs policy does not change its API behavior.
+The package is private; anonymous pull is not promised. Before evaluation, grant
+organizers package access or make the package public at the organizer-permitted
+time. Repository visibility alone does not establish registry pull access.
 The release workflow publishes newer revisions with source-SHA tags and records
 their immutable digest in its summary. No workflow automatically deploys the VM.
 

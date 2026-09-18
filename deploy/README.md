@@ -59,9 +59,9 @@ In PowerShell, keep this SSH tunnel running while using the browser:
 ssh -N -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -i C:\Users\MSI\.ssh\id_ed25519 -L 127.0.0.1:18080:127.0.0.1:18080 voltpilot@35.222.65.204
 ```
 
-Open **http://127.0.0.1:18080**. No public firewall change is needed. Leave the API
-base blank for same-origin access. Checking health spends no provider quota;
-clicking Optimize sends one scenario with at most two backend provider attempts.
+Open **http://127.0.0.1:18080**. No public firewall change is needed. The dashboard
+uses its own origin automatically. Checking health spends no provider quota;
+clicking Run optimization sends one scenario with at most two backend provider attempts.
 
 ## 4. Bounded live acceptance check
 
@@ -122,3 +122,8 @@ For Vercel, deploy only `/opt/voltpilot/current/frontend` (or the repository's
 automatic same-origin connection: browser requests stay on Vercel HTTPS with no CORS
 requirement. Disable Vercel production Deployment Protection so judges can call
 the service without login. No Vercel credentials are bundled.
+
+The `/docs` route has a separate CSP allowing only the pinned Swagger UI CDN assets
+and the SHA-256 hash of FastAPI's inline initializer. The dashboard retains its
+strict self-only script policy. When upgrading FastAPI/Swagger, rerun the Docs CSP
+regression test and update the hash if the generated initializer changes.

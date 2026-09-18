@@ -28,6 +28,25 @@ test("all public requests and responses pass display validation", () => {
   }
 });
 
+test("Vercel scopes Swagger's CSP exception to Docs, without duplicate policies", () => {
+  const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+  for (const path of ["/", "/assets/app.js", "/openapi.json", "/health", "/docs", "/docs-other"]) {
+    const policies = config.headers.filter(rule => new RegExp("^" + rule.source + "$", "i").test(path))
+      .flatMap(rule => rule.headers).filter(header => header.key === "Content-Security-Policy");
+    assert.equal(policies.length, 1, `Exactly one CSP for ${path}`);
+    const script = policies[0].value.split(";").find(value => value.trim().startsWith("script-src "));
+    assert.doesNotMatch(script, /unsafe-inline|unsafe-eval/);
+    if (path === "/docs") {
+      assert.match(script, /https:\/\/cdn\.jsdelivr\.net\/npm\/swagger-ui-dist@5\.9\.0\/swagger-ui-bundle\.js/);
+      assert.match(script, /'sha256-[A-Za-z0-9+/]+=*'/);
+      assert.match(policies[0].value, /connect-src 'self';/);
+    } else {
+      assert.equal(script.trim(), "script-src 'self'");
+      assert.doesNotMatch(policies[0].value, /unsafe-inline|cdn\.jsdelivr/);
+    }
+  }
+});
+
 test("malformed requests are rejected before spending", () => {
   for (const text of ["{", "null", "[]", "{}", " ".repeat(1024 * 1024 + 1)]) assert.throws(() => parseScenario(text));
   const mutations = [
