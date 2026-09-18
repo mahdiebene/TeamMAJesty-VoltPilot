@@ -1,4 +1,5 @@
 # VoltPilot — Team MAJesty
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/5e82796e-5beb-4caf-ab89-567d626401dd" />
 
 24-hour campus energy scheduling for the GridWise challenge. A real LLM interprets
 operator notes; deterministic guardrails and a SciPy/HiGHS optimizer produce a
