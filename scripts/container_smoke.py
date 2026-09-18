@@ -32,7 +32,7 @@ def main() -> int:
     args = parser.parse_args()
     # Mount only verification inputs; all production code/dependencies come from the image.
     mounts = []
-    for name in ("tests", "scripts", "BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json"):
+    for name in ("tests", "scripts", "BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json", "frontend/vercel.json"):
         mounts.extend(["--mount", f"type=bind,src={ROOT / name},dst=/srv/gridwise/{name},readonly"])
     security = ["--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m", "--cap-drop", "ALL",
                 "--security-opt", "no-new-privileges", "--memory", "2g", "--cpus", "2", "--pids-limit", "128"]
