@@ -1,0 +1,48 @@
+name: Build and publish verified fallback image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-image
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build the exact source revision
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:sha-${GITHUB_SHA}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" --tag "$IMAGE" .
+      - name: Test built image without live inference
+        run: python -B -m scripts.container_smoke --image "$IMAGE"
+      - name: Publish private fallback package
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE"
+          DIGEST_REF="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")"
+          echo "DIGEST_REF=$DIGEST_REF" >> "$GITHUB_ENV"
+          printf 'Source: `%s`\n\nImage: `%s`\n\nDigest: `%s`\n' "$GITHUB_SHA" "$IMAGE" "$DIGEST_REF" >> "$GITHUB_STEP_SUMMARY"
+      - name: Pull and retest immutable published image
+        run: |
+          docker image rm "$IMAGE"
+          docker pull "$DIGEST_REF"
+          python -B -m scripts.container_smoke --image "$DIGEST_REF"
+          echo 'Published-image pull/run passed. No live provider or public VPS test was performed.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Clear registry login
+        if: always()
+        run: docker logout ghcr.io

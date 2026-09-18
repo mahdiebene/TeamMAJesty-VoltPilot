@@ -1,0 +1,6 @@
+**
+!app/
+!app/*.py
+!requirements.txt
+!requirements-lock.txt
+!Dockerfile
