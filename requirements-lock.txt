@@ -1,5 +1,5 @@
 # Resolved in the isolated Python 3.12.4 Windows environment.
-# CPython 3.12 Linux x86-64 wheel dry-run passed; build/run still unverified.
+# Also installed and tested in a CPython 3.12 Linux x86-64 Docker image.
 annotated-types==0.8.0
 anyio==3.7.1
 certifi==2026.7.22

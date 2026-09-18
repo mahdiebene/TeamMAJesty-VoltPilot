@@ -4,11 +4,11 @@ An LLM-powered, minimum-cost 24-hour energy scheduler for the BUP GridWise chall
 The model interprets operator notes; validated constraints feed a SciPy/HiGHS linear
 program. An independent replay checks every serialized schedule before success.
 
-**Release status:** local offline verification passes. Linux container verification
-is automated in GitHub Actions; see the actual run outcome before relying on it.
-No public API or frontend is deployed yet. A hosted-model credential and working
-VPS access are required to finish deployment. Do not claim judge readiness from
-offline tests alone.
+**Release status:** 37 local tests, all 10 offline public cases, and a Linux Docker
+build/publish/pull/run cycle passed. The image was tested as non-root with a read-only
+filesystem. No public API or frontend is deployed yet. A privately configured
+hosted-model credential and working VPS access are required to finish deployment.
+Do not claim judge readiness from offline tests alone.
 
 ## Minimal submission
 
@@ -184,6 +184,28 @@ instead of `voltpilot:local`, first performing `docker pull` on that digest with
 authorized private-package access (`read:packages` where applicable). The judge
 also needs securely supplied runtime model credentials, not just image access.
 
+### Verified fallback reference (2026-09-18)
+
+- Source revision: `696c4ef623191ee5f11fdd5c2fd3224ec4131710`.
+- Tag: `ghcr.io/mahdiebene/teammajesty-voltpilot:sha-696c4ef623191ee5f11fdd5c2fd3224ec4131710`.
+- Digest: `ghcr.io/mahdiebene/teammajesty-voltpilot@sha256:5bfde9c6503ff1fc9fbb57ab31e3ed83e920c2d965b5411d83b3b5a58b136b1f`.
+- [Successful build, publish and pulled-image checks](https://github.com/mahdiebene/TeamMAJesty-VoltPilot/actions/runs/35358223728).
+- Anonymous pull was denied. Authorized private-package access is required.
+
+Exact commands, after private registry login and creating the runtime env-file:
+
+```bash
+IMAGE='ghcr.io/mahdiebene/teammajesty-voltpilot@sha256:5bfde9c6503ff1fc9fbb57ab31e3ed83e920c2d965b5411d83b3b5a58b136b1f'
+docker pull "$IMAGE"
+docker run --detach --name voltpilot-api --restart unless-stopped \
+  --cpus 2 --memory 2g --pids-limit 128 --cap-drop ALL \
+  --security-opt no-new-privileges --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --env-file /etc/voltpilot/voltpilot.env \
+  --publish 127.0.0.1:18080:8080 "$IMAGE"
+curl --fail --max-time 5 http://127.0.0.1:18080/health
+```
+
 This launch is loopback-only: an owner-approved HTTPS reverse proxy and narrow
 firewall rules are needed for public access. Do not change existing services,
 occupied ports, firewall policies, SSH security or perform broad Docker cleanup.
@@ -244,9 +266,15 @@ can fail safely. A dependency compatibility check is not a security audit.
 - Prior authorized Pollinations SAMPLE-01 smoke: production interpreter through
   local ASGI, 2 notes correct, 24 hours replayed, 38,365 BDT; 11.55 seconds and two
   provider attempts. This was one scenario, not a live full-suite or p95 result.
-- Current Linux build/pull/run evidence is in Actions; do not infer success from
-  workflow files alone. No public VPS endpoint, real-model container run, complete
-  live public suite or independent language holdout benchmark is verified yet.
+- Linux x86-64 CPython 3.12 Docker build succeeded. All 37 tests and all 10 offline
+  public cases passed inside the image with test-network access disabled. The
+  published image was removed locally, pulled by digest and retested successfully,
+  including real HTTP readiness, invalid input, safe missing-model failure and
+  OpenAPI checks. No live inference was used in those checks.
+- No public VPS endpoint, real-model container run, complete live public suite or
+  independent language holdout benchmark is verified yet. The confirmed VPS host
+  identity was accepted only after independent owner verification; the configured
+  SSH login was rejected. No VPS services or configuration were changed.
 - Submission still needs the verified public API URL, exact tested image digest
   with judge access, secure runtime model access, live latency/reliability evidence,
   and the required accessible video of at most three minutes.

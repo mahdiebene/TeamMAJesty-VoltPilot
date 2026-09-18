@@ -25,7 +25,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-lock.txt
       - name: Install locked dependencies
-        run: python -m pip install --only-binary=:all: -r requirements-lock.txt
+        run: |
+          python -m pip install --only-binary=:all: -r requirements-lock.txt
       - name: Validate dependencies and deterministic regressions
         run: |
           python -m pip check

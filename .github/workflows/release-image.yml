@@ -37,6 +37,14 @@ jobs:
           DIGEST_REF="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")"
           echo "DIGEST_REF=$DIGEST_REF" >> "$GITHUB_ENV"
           printf 'Source: `%s`\n\nImage: `%s`\n\nDigest: `%s`\n' "$GITHUB_SHA" "$IMAGE" "$DIGEST_REF" >> "$GITHUB_STEP_SUMMARY"
+      - name: Confirm package remains private
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PACKAGE="${GITHUB_REPOSITORY#*/}"
+          VISIBILITY="$(gh api "users/${GITHUB_REPOSITORY_OWNER}/packages/container/${PACKAGE,,}" --jq .visibility)"
+          test "$VISIBILITY" = private
+          echo 'Package visibility verified private.' >> "$GITHUB_STEP_SUMMARY"
       - name: Pull and retest immutable published image
         run: |
           docker image rm "$IMAGE"
